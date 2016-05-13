@@ -1,8 +1,7 @@
-from django.http import JsonResponse
-from django.http import HttpResponse
+from django.http import JsonResponse,HttpResponse,HttpResponseRedirect
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
-from .models import UserData
+from .models import *
 from django.shortcuts import render
 
 from rest_framework.views import APIView
@@ -12,10 +11,12 @@ from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ParseError
 from rest_framework import status
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib.sessions.backends.db import SessionStore
+import ipdb
 
 @csrf_exempt
 def login(request):
-
+	# ipdb.set_trace()
 	#Post request handling
 	if request.method == 'POST':
 		username = request.POST.get("username", "")
@@ -32,18 +33,17 @@ def login(request):
 			return JsonResponse({'status':'ok','result':{'response':status}})
 		else:
 			status = 'logged in successfully'
-
 			#generating token for user
 			token = Token.objects.get_or_create(user=user)
-
 			userdata = UserData.objects.get(author=user.username)
 
-			#sending back Json Response
-			return JsonResponse({'status':'ok','result':{'response':status,'token':str(token[0])} , 'usertype' : str(userdata.user_type)})
+			request.session['user'] = token[0]
+			return HttpResponseRedirect("/")
+			# # return JsonResponse({'status':'ok','cookie':s['user'],'result':{'response':status,'token':str(token[0])} , 'usertype' : str(userdata.user_type)})
 
 	#other request handling except POST
 	else:
-		return JsonResponse({'status':'ok','result':{'response':'invalid request!!'}})
+		return render(request, 'login/signin.html',)
 
 
 @csrf_exempt
@@ -59,16 +59,16 @@ def signup(request):
 		userdata = UserData(author = request.POST.get("username","") , user_type = request.POST.get("user_type",""));
 		userdata.save()
 
-
-
-		#sending back Json Response
 		return JsonResponse({'status':'ok','result':{'response':'successfully created'}})
 
 	#handling other requests
 	else:
 		#sending back Json Response
-		return JsonResponse({'status':'ok','result':{'response':'invalid request!!'}})
+		return render(request, 'login/signup.html',)
 
-@csrf_exempt
-def user_form(request):
-	return render(request, "login/index.html",)
+def logout(request):
+    request.session.flush()
+    if hasattr(request, 'user'):
+        from django.contrib.auth.models import AnonymousUser
+        request.user = AnonymousUser()
+        return HttpResponseRedirect('/')
